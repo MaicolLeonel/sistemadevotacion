@@ -1,0 +1,31 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Seleccionar Usuario – Sistema de Votación</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<header>
+    <h1>UNIDAD ROJA Y BLANCA – SISTEMA DE VOTACIÓN</h1>
+</header>
+
+<main class="container center">
+    <h2>Seleccionar usuario</h2>
+    <p>Elegí con qué usuario querés trabajar. Cada usuario tiene su padrón independiente.</p>
+
+    <div class="user-buttons">
+        {% for u in users %}
+        <a href="{{ url_for('panel', user=u) }}">
+            <button class="btn-user">Ingresar como {{ u|upper }}</button>
+        </a>
+        {% endfor %}
+    </div>
+</main>
+
+<footer>
+    <p>© Unidad Roja y Blanca</p>
+</footer>
+</body>
+</html>

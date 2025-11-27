@@ -1,0 +1,193 @@
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Roboto', Arial, sans-serif;
+    background: #f4f4f4;
+    color: #333;
+}
+
+header {
+    background: #c40000;
+    color: #fff;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+header h1 {
+    font-size: 24px;
+    letter-spacing: 1px;
+}
+
+.container {
+    max-width: 1100px;
+    margin: 20px auto 40px;
+    padding: 0 15px;
+}
+
+.center {
+    text-align: center;
+}
+
+.card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.upload-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.upload-card input[type="file"] {
+    flex: 1;
+}
+
+.btn-upload, .btn-download, .btn-add, .btn-user {
+    background: #c40000;
+    border: none;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s ease, transform 0.1s;
+}
+
+.btn-download {
+    margin: 10px 0 20px;
+    background: #28a745;
+}
+
+.btn-user {
+    margin: 10px;
+    min-width: 180px;
+}
+
+.btn-upload:hover, .btn-download:hover, .btn-add:hover, .btn-user:hover {
+    background: #900000;
+    transform: translateY(-1px);
+}
+
+.counters {
+    display: flex;
+    gap: 15px;
+    margin: 15px 0 20px;
+    flex-wrap: wrap;
+}
+
+.counter-card {
+    flex: 1;
+    min-width: 180px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.counter-card .count {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.counter-card.total .count {
+    color: #c40000;
+}
+.counter-card.votaron .count {
+    color: #28a745;
+}
+.counter-card.restan .count {
+    color: #ff9800;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    margin-bottom: 15px;
+}
+
+.table-container {
+    overflow-x: auto;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background: #c40000;
+    color: #fff;
+}
+
+thead th {
+    padding: 10px;
+    text-align: left;
+}
+
+tbody td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+}
+
+tbody tr:nth-child(even) {
+    background: #fafafa;
+}
+
+.btn-votar, .btn-borrar {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 5px;
+    color: #fff;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.btn-votar {
+    background: #28a745;
+}
+
+.btn-borrar {
+    background: #d11a1a;
+}
+
+.voto-ok {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.add-socio-card input[type="text"] {
+    padding: 8px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+.user-buttons {
+    margin-top: 20px;
+}
+
+footer {
+    text-align: center;
+    padding: 15px 0 20px;
+    color: #777;
+    font-size: 14px;
+}
