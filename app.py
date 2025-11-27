@@ -2,106 +2,230 @@ from flask import Flask, render_template, request, redirect, url_for, send_file
 import sqlite3
 import pandas as pd
 import io
+import os
 
 app = Flask(__name__)
 
-USERS = ["usuario1", "usuario2", "usuario3", "usuario4", "usuario5"]
+# ============================================================
+#  BASE GENERAL DE USUARIOS
+# ============================================================
+
+USERS_DB = "usuarios.db"
 
 
-def get_db_path(user: str) -> str:
-    return f"padron_{user}.db"
-
-
-def init_db(user: str) -> None:
-    db = get_db_path(user)
-    conn = sqlite3.connect(db)
+def init_usuarios_db():
+    conn = sqlite3.connect(USERS_DB)
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS socios (
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT,
-            dni TEXT,
-            voto INTEGER DEFAULT 0
+            nombre TEXT UNIQUE NOT NULL
         )
-        """
-    )
+    """)
     conn.commit()
     conn.close()
 
 
-def get_socios(user: str):
-    init_db(user)
+def get_usuarios():
+    conn = sqlite3.connect(USERS_DB)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, nombre FROM usuarios ORDER BY id DESC")
+    users = cursor.fetchall()
+    conn.close()
+    return users
+
+
+def crear_usuario(nombre):
+    conn = sqlite3.connect(USERS_DB)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO usuarios (nombre) VALUES (?)", (nombre,))
+    conn.commit()
+    conn.close()
+
+
+init_usuarios_db()
+
+
+# ============================================================
+#  DB PRIVADA PARA CADA USUARIO
+# ============================================================
+
+def get_db_path(user: str) -> str:
+    path = os.path.join(os.getcwd(), f"padron_{user}.db")
+    print(">>> BASE USADA:", path)
+    return path
+
+
+def init_user_db(user):
     db = get_db_path(user)
     conn = sqlite3.connect(db)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM socios")
-    data = cursor.fetchall()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS padrones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS socios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            padron_id INTEGER,
+            nombre TEXT,
+            dni TEXT,
+            voto INTEGER DEFAULT 0,
+            FOREIGN KEY (padron_id) REFERENCES padrones(id)
+        )
+    """)
+
+    conn.commit()
     conn.close()
-    return data
+
+
+# ============================================================
+#  PADRONES POR USUARIO
+# ============================================================
+
+def get_padrones(user):
+    init_user_db(user)
+    db = get_db_path(user)
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, nombre FROM padrones ORDER BY id DESC")
+    padrones = cursor.fetchall()
+    conn.close()
+    return padrones
+
+
+def crear_padron(user, nombre):
+    db = get_db_path(user)
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO padrones (nombre) VALUES (?)", (nombre,))
+    conn.commit()
+    conn.close()
+
+
+# ============================================================
+#  SOCIOS
+# ============================================================
+
+def get_socios(user, padron_id, buscar=""):
+    db = get_db_path(user)
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
+
+    if buscar:
+        like = f"%{buscar.lower()}%"
+        cursor.execute("""
+            SELECT id, nombre, dni, voto
+            FROM socios
+            WHERE padron_id = ?
+              AND (lower(nombre) LIKE ? OR lower(dni) LIKE ?)
+            ORDER BY nombre
+        """, (padron_id, like, like))
+    else:
+        cursor.execute("""
+            SELECT id, nombre, dni, voto
+            FROM socios
+            WHERE padron_id = ?
+            ORDER BY nombre
+        """, (padron_id,))
+
+    socios = cursor.fetchall()
+    conn.close()
+    return socios
+
+
+def get_resumen_padron(user, padron_id):
+    db = get_db_path(user)
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT COUNT(*),
+               SUM(CASE WHEN voto = 1 THEN 1 ELSE 0 END)
+        FROM socios
+        WHERE padron_id = ?
+    """, (padron_id,))
+    total, votaron = cursor.fetchone()
+    total = total or 0
+    votaron = votaron or 0
+    restan = total - votaron
+
+    conn.close()
+    return total, votaron, restan
 
 
 def process_file(file):
-    # Aceptar Excel y CSV
     if file.filename.endswith((".xlsx", ".xls")):
         df = pd.read_excel(file, dtype=str)
     elif file.filename.endswith(".csv"):
         df = pd.read_csv(file, dtype=str)
     else:
-        return None, "Formato no soportado (solo Excel o CSV)."
+        return None, "Formato no soportado."
 
-    # Normalizar columnas
-    df.columns = (
-        df.columns.str.lower()
-        .str.strip()
-        .str.replace(" ", "")
-        .str.replace("_", "")
-    )
+    df.columns = df.columns.str.lower().str.replace(" ", "").str.strip()
 
-    # Detectar columnas
     col_apellido = next((c for c in df.columns if "apellido" in c), None)
     col_nombre = next((c for c in df.columns if "nombre" in c), None)
     col_dni = next((c for c in df.columns if "dni" in c), None)
 
-    # Manejar caso donde apellido y nombre están juntos
+    if not col_dni:
+        return None, f"No se encontró columna DNI. Columnas: {list(df.columns)}"
+
     if not col_apellido and not col_nombre:
-        # Tomar primera columna como nombre completo
-        col_nombre_completo = df.columns[0]
-        df["apellido_nombre"] = df[col_nombre_completo].astype(str)
+        df["full"] = df[df.columns[0]].astype(str)
     else:
-        # Crear columna combinada
         apellido = df[col_apellido].astype(str) if col_apellido else ""
         nombre = df[col_nombre].astype(str) if col_nombre else ""
-        df["apellido_nombre"] = (apellido + " " + nombre).str.strip()
+        df["full"] = (apellido + " " + nombre).str.strip()
 
-    # Verificar DNI
-    if not col_dni:
-        return None, f"No se encontró columna de DNI. Columnas detectadas: {list(df.columns)}"
-
-    # Crear dataframe limpio
-    df_clean = df[["apellido_nombre", col_dni]].copy()
-    df_clean = df_clean.rename(columns={"apellido_nombre": "nombre", col_dni: "dni"})
+    df_clean = df[["full", col_dni]].copy()
+    df_clean = df_clean.rename(columns={"full": "nombre", col_dni: "dni"})
     df_clean = df_clean.drop_duplicates()
 
     return df_clean, None
 
 
+# ============================================================
+#  RUTAS
+# ============================================================
+
 @app.route("/")
-def select_user():
-    return render_template("select_user.html", users=USERS)
+def home():
+    usuarios = get_usuarios()
+    return render_template("usuarios.html", usuarios=usuarios)
 
 
-@app.route("/panel/<user>", methods=["GET", "POST"])
-def panel(user):
-    if user not in USERS:
-        return "Usuario no válido"
+@app.route("/usuarios/nuevo", methods=["POST"])
+def nuevo_usuario():
+    nombre = request.form.get("nombre", "").strip()
+    if nombre:
+        crear_usuario(nombre)
+        init_user_db(nombre)
+    return redirect(url_for("home"))
 
-    init_db(user)
 
+@app.route("/panel/<user>/padrones", methods=["GET", "POST"])
+def padrones(user):
+    if request.method == "POST":
+        nombre = request.form.get("nombre_padron", "").strip()
+        if nombre:
+            crear_padron(user, nombre)
+        return redirect(url_for("padrones", user=user))
+
+    lista = get_padrones(user)
+    return render_template("select_padron.html", user=user, padrones=lista)
+
+
+@app.route("/panel/<user>/padron/<int:padron_id>", methods=["GET", "POST"])
+def panel_padron(user, padron_id):
     if request.method == "POST":
         file = request.files.get("file")
-        if not file or file.filename == "":
-            return "No seleccionaste archivo"
+        if not file:
+            return "No seleccionaste archivo."
 
         df_clean, error = process_file(file)
         if error:
@@ -110,107 +234,112 @@ def panel(user):
         db = get_db_path(user)
         conn = sqlite3.connect(db)
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM socios")
+
+        cursor.execute("DELETE FROM socios WHERE padron_id = ?", (padron_id,))
 
         for _, row in df_clean.iterrows():
-            cursor.execute(
-                "INSERT INTO socios (nombre, dni) VALUES (?, ?)",
-                (row["nombre"].strip(), row["dni"].strip())
-            )
+            cursor.execute("""
+                INSERT INTO socios (padron_id, nombre, dni)
+                VALUES (?, ?, ?)
+            """, (padron_id, row["nombre"], row["dni"]))
 
         conn.commit()
         conn.close()
 
-        return redirect(url_for("panel", user=user))
+        return redirect(url_for("panel_padron", user=user, padron_id=padron_id))
 
-    socios = get_socios(user)
-    total = len(socios)
-    votaron = len([s for s in socios if s[3] == 1])
-    restan = total - votaron
+    buscar = request.args.get("buscar", "").strip()
+    socios = get_socios(user, padron_id, buscar)
+    total, votaron, restan = get_resumen_padron(user, padron_id)
+
+    db = get_db_path(user)
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
+    cursor.execute("SELECT nombre FROM padrones WHERE id = ?", (padron_id,))
+    nombre_padron = cursor.fetchone()[0]
+    conn.close()
 
     return render_template(
-        "index.html",
+        "padron.html",
+        user=user,
+        padron_id=padron_id,
+        nombre_padron=nombre_padron,
         socios=socios,
         total=total,
         votaron=votaron,
         restan=restan,
-        user=user
+        buscar=buscar
     )
 
 
-@app.route("/panel/<user>/votar/<int:socio_id>")
-def votar(user, socio_id):
-    if user not in USERS:
-        return "Usuario no válido"
-
+@app.route("/panel/<user>/padron/<int:padron_id>/votar/<int:socio_id>")
+def votar(user, padron_id, socio_id):
     db = get_db_path(user)
     conn = sqlite3.connect(db)
     cursor = conn.cursor()
-    cursor.execute("UPDATE socios SET voto=1 WHERE id=?", (socio_id,))
+    cursor.execute("UPDATE socios SET voto = 1 WHERE id = ? AND padron_id = ?", (socio_id, padron_id))
     conn.commit()
     conn.close()
+    return redirect(url_for("panel_padron", user=user, padron_id=padron_id))
 
-    return redirect(url_for("panel", user=user))
 
-
-@app.route("/panel/<user>/borrar/<int:socio_id>")
-def borrar(user, socio_id):
-    if user not in USERS:
-        return "Usuario no válido"
-
+@app.route("/panel/<user>/padron/<int:padron_id>/borrar/<int:socio_id>")
+def borrar(user, padron_id, socio_id):
     db = get_db_path(user)
     conn = sqlite3.connect(db)
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM socios WHERE id=?", (socio_id,))
+    cursor.execute("DELETE FROM socios WHERE id = ? AND padron_id = ?", (socio_id, padron_id))
     conn.commit()
     conn.close()
+    return redirect(url_for("panel_padron", user=user, padron_id=padron_id))
 
-    return redirect(url_for("panel", user=user))
 
-
-@app.route("/panel/<user>/agregar", methods=["POST"])
-def agregar(user):
-    if user not in USERS:
-        return "Usuario no válido"
-
+@app.route("/panel/<user>/padron/<int:padron_id>/agregar", methods=["POST"])
+def agregar(user, padron_id):
     apellido = request.form.get("apellido", "").strip()
     nombre = request.form.get("nombre", "").strip()
     dni = request.form.get("dni", "").strip()
 
-    if not (apellido and nombre and dni):
-        return redirect(url_for("panel", user=user))
+    if apellido and nombre and dni:
+        nombre_final = f"{apellido} {nombre}"
+        db = get_db_path(user)
+        conn = sqlite3.connect(db)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO socios (padron_id, nombre, dni)
+            VALUES (?, ?, ?)
+        """, (padron_id, nombre_final, dni))
+        conn.commit()
+        conn.close()
 
-    nombre_final = f"{apellido} {nombre}"
-
-    db = get_db_path(user)
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO socios (nombre, dni) VALUES (?, ?)",
-        (nombre_final, dni)
-    )
-    conn.commit()
-    conn.close()
-
-    return redirect(url_for("panel", user=user))
+    return redirect(url_for("panel_padron", user=user, padron_id=padron_id))
 
 
-@app.route("/panel/<user>/descargar")
-def descargar(user):
-    if user not in USERS:
-        return "Usuario no válido"
-
-    socios = get_socios(user)
+@app.route("/panel/<user>/padron/<int:padron_id>/descargar")
+def descargar(user, padron_id):
+    socios = get_socios(user, padron_id, "")
     df = pd.DataFrame(socios, columns=["ID", "Nombre", "DNI", "Voto"])
+    df["Voto"] = df["Voto"].map({1: "VOTÓ", 0: "NO VOTÓ"})
+
+    total = len(df)
+    votaron = (df["Voto"] == "VOTÓ").sum()
+    restan = total - votaron
 
     output = io.BytesIO()
-    df.to_excel(output, index=False, sheet_name=f"Padron_{user}")
-    output.seek(0)
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Padrón")
 
+        resumen = pd.DataFrame({
+            "Descripción": ["Total", "Votaron", "Faltan"],
+            "Cantidad": [total, votaron, restan]
+        })
+        resumen.to_excel(writer, index=False, sheet_name="Padrón", startrow=len(df) + 2)
+
+    output.seek(0)
     return send_file(
         output,
         as_attachment=True,
-        download_name=f"padron_{user}.xlsx",
+        download_name=f"padron_{user}_{padron_id}.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 

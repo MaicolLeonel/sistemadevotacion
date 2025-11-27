@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ nombre_padron }} – {{ user|upper }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+<header>
+    <h1>{{ nombre_padron }} – {{ user|upper }}</h1>
+</header>
+
+<main class="container">
+
+    <!-- Volver a padrones -->
+    <div class="card">
+        <a href="{{ url_for('padrones', user=user) }}">
+            <button class="btn-borrar">Volver a padrones</button>
+        </a>
+    </div>
+
+    <!-- Cargar padrón desde Excel/CSV -->
+    <div class="card upload-card">
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" required>
+            <button type="submit" class="btn-upload">Cargar padrón (reemplaza este padrón)</button>
+        </form>
+    </div>
+
+    <!-- Descargar Excel -->
+    <a href="{{ url_for('descargar', user=user, padron_id=padron_id) }}">
+        <button class="btn-download">Descargar Excel</button>
+    </a>
+
+    <!-- Contadores -->
+    <div class="counters">
+        <div class="counter-card total">
+            <div class="count">{{ total }}</div>
+            Total padrón
+        </div>
+        <div class="counter-card votaron">
+            <div class="count">{{ votaron }}</div>
+            Votaron
+        </div>
+        <div class="counter-card restan">
+            <div class="count">{{ restan }}</div>
+            Faltan
+        </div>
+    </div>
+
+    <!-- Buscador -->
+    <form method="GET">
+        <input 
+            type="text" 
+            name="buscar" 
+            placeholder="Buscar por apellido, nombre o DNI..."
+            value="{{ buscar }}"
+            class="search-input">
+    </form>
+
+    <!-- Tabla -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Apellido y Nombre</th>
+                    <th>DNI</th>
+                    <th>Votar</th>
+                    <th>Borrar</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for socio in socios %}
+                <tr>
+                    <td>{{ socio[1] }}</td>
+                    <td>{{ socio[2] }}</td>
+                    <td>
+                        {% if socio[3] == 0 %}
+                        <a href="{{ url_for('votar', user=user, padron_id=padron_id, socio_id=socio[0]) }}" class="btn-votar">
+                            VOTO
+                        </a>
+                        {% else %}
+                        <span class="voto-ok">✔ VOTÓ</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('borrar', user=user, padron_id=padron_id, socio_id=socio[0]) }}" class="btn-borrar">
+                            Borrar
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Agregar socio manual -->
+    <div class="card add-socio-card">
+        <h3>Agregar socio manualmente</h3>
+        <form method="POST" action="{{ url_for('agregar', user=user, padron_id=padron_id) }}">
+            <input type="text" name="apellido" placeholder="Apellido" required>
+            <input type="text" name="nombre" placeholder="Nombre" required>
+            <input type="text" name="dni" placeholder="DNI" required>
+            <button type="submit" class="btn-add">Agregar</button>
+        </form>
+    </div>
+
+</main>
+
+<footer>
+    <p>© Unidad Roja y Blanca</p>
+</footer>
+
+</body>
+</html>

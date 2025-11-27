@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Padrones</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<header><h1>Padrones de {{ user }}</h1></header>
+
+<main class="container">
+
+    <div class="card">
+        <h2>Crear nuevo padrón</h2>
+        <form method="POST">
+            <input type="text" name="nombre_padron" placeholder="Nombre del padrón" required>
+            <button type="submit" class="btn-add">Crear padrón</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Lista de padrones</h2>
+        {% if padrones %}
+            <ul>
+                {% for p in padrones %}
+                <li>
+                    {{ p[1] }}
+                    <a href="{{ url_for('panel_padron', user=user, padron_id=p[0]) }}">
+                        <button class="btn-user">Entrar</button>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No hay padrones.</p>
+        {% endif %}
+    </div>
+
+    <a href="{{ url_for('home') }}"><button class="btn-back">Volver a usuarios</button></a>
+
+</main>
+
+</body>
+</html>

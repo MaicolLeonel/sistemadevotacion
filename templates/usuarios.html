@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Usuarios del Sistema</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<header>
+    <h1>Sistema de Votación – Usuarios</h1>
+</header>
+
+<main class="container">
+
+    <div class="card">
+        <h2>Crear nuevo usuario</h2>
+        <form method="POST" action="/usuarios/nuevo">
+            <input type="text" name="nombre" placeholder="Nombre del usuario" required>
+            <button type="submit" class="btn-add">Crear usuario</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Usuarios registrados</h2>
+
+        {% if usuarios %}
+            <ul>
+                {% for u in usuarios %}
+                    <li style="margin-bottom:10px;">
+                        <b>{{ u[1] }}</b>
+                        <a href="{{ url_for('padrones', user=u[1]) }}">
+                            <button class="btn-user" style="margin-left:10px;">Entrar</button>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No hay usuarios creados.</p>
+        {% endif %}
+    </div>
+
+</main>
+
+<footer>
+    <p>© Unidad Roja y Blanca</p>
+</footer>
+
+</body>
+</html>
